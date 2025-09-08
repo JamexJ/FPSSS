@@ -1,0 +1,168 @@
+-- ======================================================
+-- 📌 FPS THANHLONG - Mini Spam Button + Anti-Accessories (Fix load chậm)
+-- ======================================================
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+-- 🔹 Chờ Character và Backpack sẵn sàng
+local function WaitForCharacter()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    repeat task.wait() until char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid")
+    return char
+end
+
+local function WaitForBackpack()
+    return LocalPlayer:WaitForChild("Backpack")
+end
+
+-- 🔹 XÓA PHỤ KIỆN CỦA BẠN
+local function removeAllAccessoriesFromCharacter()
+    local character = LocalPlayer.Character
+    if not character then return end
+    for _, item in ipairs(character:GetChildren()) do
+        if item:IsA("Accessory") or item:IsA("LayeredClothing")
+           or item:IsA("Shirt") or item:IsA("ShirtGraphic")
+           or item:IsA("Pants") or item:IsA("BodyColors")
+           or item:IsA("CharacterMesh") then
+            pcall(function() item:Destroy() end)
+        end
+    end
+end
+
+-- đảm bảo khi spawn là chạy liền
+LocalPlayer.CharacterAdded:Connect(function()
+    task.spawn(function()
+        local char = WaitForCharacter()
+        for i = 1, 10 do
+            removeAllAccessoriesFromCharacter()
+            task.wait(0.1)
+        end
+    end)
+end)
+
+if LocalPlayer.Character then
+    task.defer(function()
+        local char = WaitForCharacter()
+        for i = 1, 10 do
+            removeAllAccessoriesFromCharacter()
+            task.wait(0.1)
+        end
+    end)
+end
+
+-- 🔹 ITEM CHO SPAM
+local allowedItems = {
+    ["Tung Bat"] = true,
+    ["Medusa's Head"] = true,
+    ["Laser Cape"] = true,
+}
+
+-- 🔹 SPAM ITEM
+local InventorySpam = {running = false, delay = 0.1}
+
+function InventorySpam:Start()
+    if self.running then return end
+    self.running = true
+    self._stop = false
+    task.spawn(function()
+        while self.running and not self._stop do
+            local backpack = WaitForBackpack()
+            local char = LocalPlayer.Character
+            if backpack and char then
+                for _, tool in ipairs(backpack:GetChildren()) do
+                    if not self.running then break end
+                    if tool:IsA("Tool") and allowedItems[tool.Name] then
+                        pcall(function() tool.Parent = char end)
+                        task.wait(self.delay/2)
+                        pcall(function() tool.Parent = backpack end)
+                        task.wait(self.delay/2)
+                    end
+                end
+            else
+                task.wait(0.3)
+            end
+        end
+    end)
+end
+
+function InventorySpam:Stop()
+    self.running = false
+    self._stop = true
+    local backpack = WaitForBackpack()
+    local char = LocalPlayer.Character
+    if backpack and char then
+        for _, tool in ipairs(char:GetChildren()) do
+            if tool:IsA("Tool") then
+                pcall(function() tool.Parent = backpack end)
+            end
+        end
+    end
+end
+
+-- 🔹 GUI MINI BUTTON
+local old = playerGui:FindFirstChild("FPS_THANHLONG_PANEL")
+if old then old:Destroy() end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "FPS_THANHLONG_PANEL"
+gui.ResetOnSpawn = false
+gui.Parent = playerGui
+
+local panel = Instance.new("Frame", gui)
+panel.BackgroundColor3 = Color3.fromRGB(28,28,28)
+panel.BorderSizePixel = 0
+Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 6)
+panel.Size = UDim2.new(0, 60, 0, 28)
+
+local btn = Instance.new("TextButton", panel)
+btn.Size = UDim2.new(1, 0, 1, 0)
+btn.BackgroundTransparency = 1
+btn.Text = "SPAM"
+btn.Font = Enum.Font.GothamBold
+btn.TextColor3 = Color3.fromRGB(255,255,255)
+btn.TextSize = 12
+
+local circle = Instance.new("Frame", panel)
+circle.Size = UDim2.new(0, 10, 0, 10)
+circle.Position = UDim2.new(1, -12, 0.5, -5)
+circle.BackgroundColor3 = Color3.fromRGB(255,40,40)
+circle.BorderSizePixel = 0
+Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+
+local state = false
+local function updateVisual()
+    circle.BackgroundColor3 = state and Color3.fromRGB(50,255,60) or Color3.fromRGB(255,40,40)
+end
+
+btn.MouseButton1Click:Connect(function()
+    state = not state
+    if state then
+        InventorySpam:Start()
+    else
+        InventorySpam:Stop()
+    end
+    updateVisual()
+end)
+updateVisual()
+
+-- đặt góc phải
+panel.Position = UDim2.new(1, -70, 0, 50)
+panel.AnchorPoint = Vector2.new(0, 0)
+
+-- phím tắt ALT TRÁI
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.LeftAlt then
+        state = not state
+        if state then
+            InventorySpam:Start()
+        else
+            InventorySpam:Stop()
+        end
+        updateVisual()
+    end
+end)
