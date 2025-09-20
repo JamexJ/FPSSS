@@ -1,12 +1,10 @@
 -- ======================================================
--- 📌 FPS THANHLONG - Mini Spam Button + Anti-Accessories (Fix load chậm)
--- -- Chỉ sửa phần spam: giữ tool trên tay và spam bằng :Activate()
+-- 📌 FPS THANHLONG - Keep Tool OnHand + Anti-Accessories (tối ưu FPS)
 -- ======================================================
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 -- 🔹 Chờ Character và Backpack sẵn sàng
@@ -20,7 +18,7 @@ local function WaitForBackpack()
     return LocalPlayer:WaitForChild("Backpack")
 end
 
--- 🔹 XÓA PHỤ KIỆN CỦA BẠN
+-- 🔹 XÓA PHỤ KIỆN / QUẦN ÁO CỦA BẠN
 local function removeAllAccessoriesFromCharacter()
     local character = LocalPlayer.Character
     if not character then return end
@@ -34,7 +32,7 @@ local function removeAllAccessoriesFromCharacter()
     end
 end
 
--- đảm bảo khi spawn là chạy liền
+-- Spawn lại → xóa đồ bạn
 LocalPlayer.CharacterAdded:Connect(function()
     task.spawn(function()
         local char = WaitForCharacter()
@@ -55,41 +53,12 @@ if LocalPlayer.Character then
     end)
 end
 
--- 🔹 ITEM CHO SPAM
+-- 🔹 GIỮ TOOL TRÊN TAY LIÊN TỤC
 local allowedItems = {
-    ["Glitched Slap"] = true,
+    ["Glitched Slap"] = true, -- thay tên item của bạn tại đây
 }
 
--- 🔹 SPAM ITEM (SỬA: giữ trên tay, không nhả ra liên tục)
--- Giữ nguyên delay gốc bạn đặt
-local InventorySpam = {running = false, delay = 0.185}
-
--- Helper: tìm tool hợp lệ đang cầm (trong Character)
-local function getEquippedAllowedTool()
-    local char = LocalPlayer.Character
-    if not char then return nil end
-    for _, v in ipairs(char:GetChildren()) do
-        if v:IsA("Tool") and allowedItems[v.Name] then
-            return v
-        end
-    end
-    -- cũng thử FindFirstChildOfClass cho trường hợp chỉ có 1 tool
-    local t = char:FindFirstChildOfClass("Tool")
-    if t and allowedItems[t.Name] then return t end
-    return nil
-end
-
--- Helper: tìm tool hợp lệ trong Backpack
-local function findAllowedToolInBackpack()
-    local bp = LocalPlayer:FindFirstChild("Backpack")
-    if not bp then return nil end
-    for _, tool in ipairs(bp:GetChildren()) do
-        if tool:IsA("Tool") and allowedItems[tool.Name] then
-            return tool
-        end
-    end
-    return nil
-end
+local InventorySpam = {running = false, delay = 0.1}
 
 function InventorySpam:Start()
     if self.running then return end
@@ -97,32 +66,18 @@ function InventorySpam:Start()
     self._stop = false
     task.spawn(function()
         while self.running and not self._stop do
+            local backpack = WaitForBackpack()
             local char = LocalPlayer.Character
-            if not char then
-                task.wait(0.2)
-                continue
-            end
-
-            -- 1) Nếu đã có tool hợp lệ trên tay -> spam bằng Activate()
-            local equipped = getEquippedAllowedTool()
-            if equipped then
-                -- pcall để tránh lỗi nếu Activate không khả dụng
-                pcall(function()
-                    equipped:Activate()
-                end)
-                task.wait(self.delay)
-            else
-                -- 2) Nếu chưa cầm tool, thử equip 1 tool hợp lệ từ Backpack (một lần)
-                local bpTool = findAllowedToolInBackpack()
-                if bpTool then
-                    pcall(function() bpTool.Parent = char end)
-                    -- cho client một ít thời gian để equip
-                    task.wait(0.05)
-                else
-                    -- không có tool nào phù hợp -> chờ lâu hơn
-                    task.wait(0.3)
+            if backpack and char then
+                for _, tool in ipairs(backpack:GetChildren()) do
+                    if not self.running then break end
+                    if tool:IsA("Tool") and allowedItems[tool.Name] then
+                        -- giữ tool luôn ở trên tay
+                        pcall(function() tool.Parent = char end)
+                    end
                 end
             end
+            task.wait(self.delay)
         end
     end)
 end
@@ -130,7 +85,6 @@ end
 function InventorySpam:Stop()
     self.running = false
     self._stop = true
-    -- Giữ hành vi cũ: trả tất cả tool trên Character về Backpack
     local backpack = WaitForBackpack()
     local char = LocalPlayer.Character
     if backpack and char then
@@ -205,3 +159,48 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         updateVisual()
     end
 end)
+
+-- ======================================================
+-- 🔹 ẨN PHỤ KIỆN / QUẦN ÁO NGƯỜI CHƠI KHÁC
+-- ======================================================
+local function hideAccessoriesFromCharacter(character)
+    for _, item in ipairs(character:GetChildren()) do
+        if item:IsA("Accessory") or item:IsA("LayeredClothing")
+           or item:IsA("Shirt") or item:IsA("ShirtGraphic")
+           or item:IsA("Pants") or item:IsA("BodyColors")
+           or item:IsA("CharacterMesh") then
+            for _, part in ipairs(item:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.LocalTransparencyModifier = 1
+                end
+            end
+        end
+    end
+end
+
+-- Ẩn cho tất cả người chơi hiện có
+for _, plr in ipairs(Players:GetPlayers()) do
+    if plr ~= LocalPlayer and plr.Character then
+        hideAccessoriesFromCharacter(plr.Character)
+    end
+end
+
+-- Khi người chơi mới join
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(char)
+        char:WaitForChild("HumanoidRootPart", 5)
+        task.wait(0.2)
+        hideAccessoriesFromCharacter(char)
+    end)
+end)
+
+-- Khi người chơi cũ reset
+for _, plr in ipairs(Players:GetPlayers()) do
+    if plr ~= LocalPlayer then
+        plr.CharacterAdded:Connect(function(char)
+            char:WaitForChild("HumanoidRootPart", 5)
+            task.wait(0.2)
+            hideAccessoriesFromCharacter(char)
+        end)
+    end
+end
