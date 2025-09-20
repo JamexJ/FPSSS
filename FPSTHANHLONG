@@ -56,9 +56,7 @@ end
 
 -- 🔹 ITEM CHO SPAM
 local allowedItems = {
-    ["Tung Bat"] = true,
-    ["Medusa's Head"] = true,
-    ["Laser Cape"] = true,
+    ["Glitched Slap"] = true,
 }
 
 -- 🔹 SPAM ITEM
