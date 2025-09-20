@@ -1,15 +1,16 @@
 -- ======================================================
--- 📌 FPS THANHLONG - Keep Tool OnHand + Anti-Accessories (tối ưu FPS)
+-- 📌 FPS THANHLONG - Keep Tool OnHand + AutoClear Accessories (Full + Hotkey)
 -- ======================================================
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 -- 🔹 Chờ Character và Backpack sẵn sàng
-local function WaitForCharacter()
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local function WaitForCharacter(plr)
+    local char = plr.Character or plr.CharacterAdded:Wait()
     repeat task.wait() until char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid")
     return char
 end
@@ -18,44 +19,57 @@ local function WaitForBackpack()
     return LocalPlayer:WaitForChild("Backpack")
 end
 
--- 🔹 XÓA PHỤ KIỆN / QUẦN ÁO CỦA BẠN
-local function removeAllAccessoriesFromCharacter()
-    local character = LocalPlayer.Character
+-- 🔹 XÓA PHỤ KIỆN / QUẦN ÁO
+local function clearAccessories(character)
     if not character then return end
     for _, item in ipairs(character:GetChildren()) do
         if item:IsA("Accessory") or item:IsA("LayeredClothing")
-           or item:IsA("Shirt") or item:IsA("ShirtGraphic")
-           or item:IsA("Pants") or item:IsA("BodyColors")
-           or item:IsA("CharacterMesh") then
+        or item:IsA("Shirt") or item:IsA("ShirtGraphic")
+        or item:IsA("Pants") or item:IsA("BodyColors")
+        or item:IsA("CharacterMesh") then
             pcall(function() item:Destroy() end)
         end
     end
 end
 
--- Spawn lại → xóa đồ bạn
-LocalPlayer.CharacterAdded:Connect(function()
-    task.spawn(function()
-        local char = WaitForCharacter()
-        for i = 1, 10 do
-            removeAllAccessoriesFromCharacter()
-            task.wait(0.1)
-        end
-    end)
-end)
-
-if LocalPlayer.Character then
-    task.defer(function()
-        local char = WaitForCharacter()
-        for i = 1, 10 do
-            removeAllAccessoriesFromCharacter()
-            task.wait(0.1)
-        end
+-- 🔹 Auto clear cho player
+local function setupAutoClear(plr)
+    if plr.Character then
+        clearAccessories(plr.Character)
+    end
+    plr.CharacterAdded:Connect(function(char)
+        task.spawn(function()
+            WaitForCharacter(plr)
+            task.wait(0.2)
+            clearAccessories(char)
+        end)
     end)
 end
 
+-- Bản thân bạn cũng clear
+setupAutoClear(LocalPlayer)
+
+-- Những người khác cũng clear khi join/reset
+for _, plr in ipairs(Players:GetPlayers()) do
+    setupAutoClear(plr)
+end
+Players.PlayerAdded:Connect(setupAutoClear)
+
+-- 🔹 Auto clear định kỳ (10 giây một lần)
+task.spawn(function()
+    while true do
+        task.wait(10) -- chỉnh số giây tuỳ ý
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr.Character then
+                clearAccessories(plr.Character)
+            end
+        end
+    end
+end)
+
 -- 🔹 GIỮ TOOL TRÊN TAY LIÊN TỤC
 local allowedItems = {
-    ["Glitched Slap"] = true, -- thay tên item của bạn tại đây
+    ["Glitched Slap"] = true, -- thay tên item bạn muốn giữ
 }
 
 local InventorySpam = {running = false, delay = 0.1}
@@ -72,7 +86,6 @@ function InventorySpam:Start()
                 for _, tool in ipairs(backpack:GetChildren()) do
                     if not self.running then break end
                     if tool:IsA("Tool") and allowedItems[tool.Name] then
-                        -- giữ tool luôn ở trên tay
                         pcall(function() tool.Parent = char end)
                     end
                 end
@@ -109,10 +122,10 @@ local panel = Instance.new("Frame", gui)
 panel.BackgroundColor3 = Color3.fromRGB(28,28,28)
 panel.BorderSizePixel = 0
 Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 6)
-panel.Size = UDim2.new(0, 60, 0, 28)
+panel.Size = UDim2.new(0, 120, 0, 28)
 
 local btn = Instance.new("TextButton", panel)
-btn.Size = UDim2.new(1, 0, 1, 0)
+btn.Size = UDim2.new(0.5, 0, 1, 0)
 btn.BackgroundTransparency = 1
 btn.Text = "SPAM"
 btn.Font = Enum.Font.GothamBold
@@ -121,7 +134,7 @@ btn.TextSize = 12
 
 local circle = Instance.new("Frame", panel)
 circle.Size = UDim2.new(0, 10, 0, 10)
-circle.Position = UDim2.new(1, -12, 0.5, -5)
+circle.Position = UDim2.new(0.5, -12, 0.5, -5)
 circle.BackgroundColor3 = Color3.fromRGB(255,40,40)
 circle.BorderSizePixel = 0
 Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
@@ -142,13 +155,34 @@ btn.MouseButton1Click:Connect(function()
 end)
 updateVisual()
 
+-- 🔹 Nút CLEAR thủ công
+local clearBtn = Instance.new("TextButton", panel)
+clearBtn.Size = UDim2.new(0.5, 0, 1, 0)
+clearBtn.Position = UDim2.new(0.5, 0, 0, 0)
+clearBtn.BackgroundTransparency = 1
+clearBtn.Text = "CLEAR"
+clearBtn.Font = Enum.Font.GothamBold
+clearBtn.TextColor3 = Color3.fromRGB(255,200,100)
+clearBtn.TextSize = 12
+
+local function clearAllPlayers()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character then
+            clearAccessories(plr.Character)
+        end
+    end
+end
+
+clearBtn.MouseButton1Click:Connect(clearAllPlayers)
+
 -- đặt góc phải
-panel.Position = UDim2.new(1, -70, 0, 50)
+panel.Position = UDim2.new(1, -130, 0, 50)
 panel.AnchorPoint = Vector2.new(0, 0)
 
--- phím tắt ALT TRÁI
+-- 🔹 Phím tắt
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
+    -- ALT trái → bật/tắt giữ tool
     if input.KeyCode == Enum.KeyCode.LeftAlt then
         state = not state
         if state then
@@ -158,49 +192,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end
         updateVisual()
     end
+    -- Numpad Enter → Clear Accessories
+    if input.KeyCode == Enum.KeyCode.KeypadEnter then
+        clearAllPlayers()
+    end
 end)
-
--- ======================================================
--- 🔹 ẨN PHỤ KIỆN / QUẦN ÁO NGƯỜI CHƠI KHÁC
--- ======================================================
-local function hideAccessoriesFromCharacter(character)
-    for _, item in ipairs(character:GetChildren()) do
-        if item:IsA("Accessory") or item:IsA("LayeredClothing")
-           or item:IsA("Shirt") or item:IsA("ShirtGraphic")
-           or item:IsA("Pants") or item:IsA("BodyColors")
-           or item:IsA("CharacterMesh") then
-            for _, part in ipairs(item:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.LocalTransparencyModifier = 1
-                end
-            end
-        end
-    end
-end
-
--- Ẩn cho tất cả người chơi hiện có
-for _, plr in ipairs(Players:GetPlayers()) do
-    if plr ~= LocalPlayer and plr.Character then
-        hideAccessoriesFromCharacter(plr.Character)
-    end
-end
-
--- Khi người chơi mới join
-Players.PlayerAdded:Connect(function(plr)
-    plr.CharacterAdded:Connect(function(char)
-        char:WaitForChild("HumanoidRootPart", 5)
-        task.wait(0.2)
-        hideAccessoriesFromCharacter(char)
-    end)
-end)
-
--- Khi người chơi cũ reset
-for _, plr in ipairs(Players:GetPlayers()) do
-    if plr ~= LocalPlayer then
-        plr.CharacterAdded:Connect(function(char)
-            char:WaitForChild("HumanoidRootPart", 5)
-            task.wait(0.2)
-            hideAccessoriesFromCharacter(char)
-        end)
-    end
-end
