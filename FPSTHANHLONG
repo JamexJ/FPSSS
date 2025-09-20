@@ -60,7 +60,7 @@ local allowedItems = {
 }
 
 -- 🔹 SPAM ITEM
-local InventorySpam = {running = false, delay = 0.15}
+local InventorySpam = {running = false, delay = 0.1}
 
 function InventorySpam:Start()
     if self.running then return end
