@@ -1,5 +1,6 @@
 -- ======================================================
 -- 📌 FPS THANHLONG - Mini Spam Button + Anti-Accessories (Fix load chậm)
+-- -- Chỉ sửa phần spam: giữ tool trên tay và spam bằng :Activate()
 -- ======================================================
 
 local Players = game:GetService("Players")
@@ -59,8 +60,36 @@ local allowedItems = {
     ["Glitched Slap"] = true,
 }
 
--- 🔹 SPAM ITEM
+-- 🔹 SPAM ITEM (SỬA: giữ trên tay, không nhả ra liên tục)
+-- Giữ nguyên delay gốc bạn đặt
 local InventorySpam = {running = false, delay = 0.185}
+
+-- Helper: tìm tool hợp lệ đang cầm (trong Character)
+local function getEquippedAllowedTool()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    for _, v in ipairs(char:GetChildren()) do
+        if v:IsA("Tool") and allowedItems[v.Name] then
+            return v
+        end
+    end
+    -- cũng thử FindFirstChildOfClass cho trường hợp chỉ có 1 tool
+    local t = char:FindFirstChildOfClass("Tool")
+    if t and allowedItems[t.Name] then return t end
+    return nil
+end
+
+-- Helper: tìm tool hợp lệ trong Backpack
+local function findAllowedToolInBackpack()
+    local bp = LocalPlayer:FindFirstChild("Backpack")
+    if not bp then return nil end
+    for _, tool in ipairs(bp:GetChildren()) do
+        if tool:IsA("Tool") and allowedItems[tool.Name] then
+            return tool
+        end
+    end
+    return nil
+end
 
 function InventorySpam:Start()
     if self.running then return end
@@ -68,20 +97,31 @@ function InventorySpam:Start()
     self._stop = false
     task.spawn(function()
         while self.running and not self._stop do
-            local backpack = WaitForBackpack()
             local char = LocalPlayer.Character
-            if backpack and char then
-                for _, tool in ipairs(backpack:GetChildren()) do
-                    if not self.running then break end
-                    if tool:IsA("Tool") and allowedItems[tool.Name] then
-                        pcall(function() tool.Parent = char end)
-                        task.wait(self.delay/2)
-                        pcall(function() tool.Parent = backpack end)
-                        task.wait(self.delay/2)
-                    end
-                end
+            if not char then
+                task.wait(0.2)
+                continue
+            end
+
+            -- 1) Nếu đã có tool hợp lệ trên tay -> spam bằng Activate()
+            local equipped = getEquippedAllowedTool()
+            if equipped then
+                -- pcall để tránh lỗi nếu Activate không khả dụng
+                pcall(function()
+                    equipped:Activate()
+                end)
+                task.wait(self.delay)
             else
-                task.wait(0.3)
+                -- 2) Nếu chưa cầm tool, thử equip 1 tool hợp lệ từ Backpack (một lần)
+                local bpTool = findAllowedToolInBackpack()
+                if bpTool then
+                    pcall(function() bpTool.Parent = char end)
+                    -- cho client một ít thời gian để equip
+                    task.wait(0.05)
+                else
+                    -- không có tool nào phù hợp -> chờ lâu hơn
+                    task.wait(0.3)
+                end
             end
         end
     end)
@@ -90,6 +130,7 @@ end
 function InventorySpam:Stop()
     self.running = false
     self._stop = true
+    -- Giữ hành vi cũ: trả tất cả tool trên Character về Backpack
     local backpack = WaitForBackpack()
     local char = LocalPlayer.Character
     if backpack and char then
